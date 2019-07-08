@@ -35,16 +35,19 @@ def _set_attributes(element, **attributes):
         element.setAttribute(key, value)
 
 
-def create_svg_object():
+def create_svg_object(doctype):
     imp = xml.dom.getDOMImplementation()
-    doctype = imp.createDocumentType(
-        'svg',
-        '-//W3C//DTD SVG 1.1//EN',
-        'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'
-    )
-    document = imp.createDocument(None, 'svg', doctype)
-    _set_attributes(document.documentElement, version='1.1',
-                    xmlns='http://www.w3.org/2000/svg')
+    if doctype:
+        doctype = imp.createDocumentType(
+            'svg',
+            '-//W3C//DTD SVG 1.1//EN',
+            'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'
+        )
+        document = imp.createDocument(None, 'svg', doctype)
+        _set_attributes(document.documentElement, version='1.1',
+            xmlns='http://www.w3.org/2000/svg')
+    else:
+        document = imp.createDocument(None, 'svg',None)
     return document
 
 
@@ -231,10 +234,12 @@ class SVGWriter(BaseWriter):
         self._document = None
         self._root = None
         self._group = None
+        self.include_doctype = True
+        self.include_document = True
 
     def _init(self, code):
         width, height = self.calculate_size(len(code[0]), len(code), self.dpi)
-        self._document = create_svg_object()
+        self._document = create_svg_object(self.include_doctype)
         self._root = self._document.documentElement
         attributes = dict(width=SIZE.format(width), height=SIZE.format(height))
         _set_attributes(self._root, **attributes)
@@ -279,10 +284,17 @@ class SVGWriter(BaseWriter):
 
     def _finish(self):
         if self.compress:
-            return self._document.toxml(encoding='UTF-8')
+            if self.include_doctype:
+                return self._document.toxml(encoding='UTF-8')
+            else:
+                return ''.join(node.toxml('utf-8') for node in self._document.childNodes)
         else:
-            return self._document.toprettyxml(indent=4 * ' ', newl=os.linesep,
-                                              encoding='UTF-8')
+            if self.include_document:
+                return self._document.toprettyxml(indent=4 * ' ', newl=os.linesep,
+                                                encoding='UTF-8')
+            else:
+                return self._group.toprettyxml(indent=4 * ' ', newl=os.linesep,
+                                                encoding='UTF-8')
 
     def save(self, filename, output):
         if self.compress:
